@@ -10,7 +10,8 @@ EXCEL_FILE = 'gastos.xlsx'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Crear carpeta si no existe
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if not os.path.isdir(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Inicializar Excel si no existe
 if not os.path.exists(EXCEL_FILE):
