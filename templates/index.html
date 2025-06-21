@@ -1,52 +1,93 @@
-from flask import Flask, render_template, request, redirect, send_file
-from werkzeug.utils import secure_filename
-import os
-import pandas as pd
-from datetime import datetime
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquidación de Gastos de Viaje</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, select, textarea { width: 100%; padding: 6px; margin-top: 4px; }
+    button { margin-top: 15px; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h2>Formulario de Liquidación de Gastos</h2>
+  <form id="gastosForm">
+    <label for="item">Item:</label>
+    <select id="item" name="item" onchange="toggleDiners()">
+      <option value="parking">Parking</option>
+      <option value="meals">Meals</option>
+      <option value="taxi">Taxi</option>
+      <option value="tolls">Tolls</option>
+      <option value="fuel">Fuel</option>
+      <option value="car">Car</option>
+      <option value="ext_entert">Ext. Entert.</option>
+      <option value="others">Others</option>
+    </select>
 
-app = Flask(__name__)
-UPLOAD_FOLDER = 'static/uploads'
-EXCEL_FILE = 'gastos.xlsx'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    <label for="date">Date:</label>
+    <input type="date" id="date" name="date" required>
 
-# Crear carpeta si no existe
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    <label for="amount">Amount (€):</label>
+    <input type="number" id="amount" name="amount" step="0.01" min="0" required>
 
-# Inicializar Excel si no existe
-if not os.path.exists(EXCEL_FILE):
-    df = pd.DataFrame(columns=['Item', 'Date', 'Amount', 'Customer', 'Diners', 'Ticket'])
-    df.to_excel(EXCEL_FILE, index=False)
+    <label for="customer">Customer:</label>
+    <input type="text" id="customer" name="customer" required>
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+    <label for="diners">Diners (solo para Ext. Entert.):</label>
+    <textarea id="diners" name="diners" disabled></textarea>
 
-@app.route('/guardar_gasto', methods=['POST'])
-def guardar_gasto():
-    item = request.form.get('item')
-    date = request.form.get('date')
-    amount = float(request.form.get('amount'))
-    customer = request.form.get('customer')
-    diners = request.form.get('diners') if item == 'ext_entert' else ''
+    <label for="ticket">Foto del Ticket:</label>
+    <input type="file" id="ticket" name="ticket" accept="image/*" capture="environment" required>
 
-    # Guardar imagen
-    ticket = request.files['ticket']
-    filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{ticket.filename}")
-    ticket_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    ticket.save(ticket_path)
+    <button type="submit">Guardar Gasto</button>
+    <button type="button" onclick="resetForm()">Resetear</button>
+  </form>
 
-    # Cargar Excel y añadir fila
-    df = pd.read_excel(EXCEL_FILE)
-    df.loc[len(df)] = [item, date, amount, customer, diners, ticket_path]
-    df.to_excel(EXCEL_FILE, index=False)
+  <script>
+    function toggleDiners() {
+      const item = document.getElementById("item").value;
+      const diners = document.getElementById("diners");
+      if (item === "ext_entert") {
+        diners.disabled = false;
+      } else {
+        diners.disabled = true;
+        diners.value = "";
+      }
+    }
 
-    return ('', 204)  # 204 No Content → evita recarga
+    function resetForm() {
+      document.getElementById("gastosForm").reset();
+      toggleDiners();
+      fetch('/reset', { method: 'POST' });
+    }
 
-@app.route('/reset', methods=['POST'])
-def reset():
-    df = pd.DataFrame(columns=['Item', 'Date', 'Amount', 'Customer', 'Diners', 'Ticket'])
-    df.to_excel(EXCEL_FILE, index=False)
-    return ('', 204)
+    document.getElementById("gastosForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
 
-if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+      const confirmacion = confirm("¿Deseas confirmar y guardar este gasto?");
+      if (!confirmacion) return;
+
+      const formData = new FormData(this);
+      try {
+        const response = await fetch("/guardar_gasto", {
+          method: "POST",
+          body: formData
+        });
+
+        if (response.ok) {
+          alert("✅ Gasto guardado correctamente.");
+          this.reset();
+          toggleDiners();
+        } else {
+          alert("❌ Error al guardar el gasto. Inténtalo de nuevo.");
+        }
+      } catch (error) {
+        alert("⚠️ Error de red o del servidor.");
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>
